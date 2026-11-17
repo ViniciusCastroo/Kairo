@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Kairo
+GenericName=Navegador
+Comment=Navegador leve em GTK4 e WebKitGTK
+Exec=kairo
+Icon=dev.example.Kairo
+Terminal=false
+Categories=Network;WebBrowser;GTK;
+Keywords=web;browser;internet;navegador;
+StartupNotify=true
+StartupWMClass=dev.example.Kairo

@@ -141,6 +141,15 @@ cargo test --locked --offline --test gtk-tabs -- --run-gtk
 O identificador `dev.example.Kairo` é provisório para desenvolvimento.
 O protótipo mantém as configurações padrão de sandbox e TLS do WebKitGTK.
 
+### Instalar no menu de aplicativos
+
+```bash
+scripts/install-desktop.sh
+```
+
+Instala o binário em `~/.local/bin/kairo`, o ícone e o atalho
+`data/dev.example.Kairo.desktop` em `~/.local/share`. Rode de novo para atualizar.
+
 ## Estrutura
 
 ```text

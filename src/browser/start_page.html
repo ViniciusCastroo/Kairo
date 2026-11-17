@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-{{NONCE}}'; img-src data:; font-src data:; connect-src 'none'; form-action https://duckduckgo.com/ https://www.google.com/search; base-uri 'none'; object-src 'none'">
+<meta name="color-scheme" content="dark">
+<title>Nova aba</title>
+<style>{{CSS}}</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="kairo://start/" aria-label="Página inicial do Kairo"><img class="brand-logo" src="{{LOGO}}" alt=""></a>
+  <div class="datetime"><time id="clock">--:--</time><span id="date"></span></div>
+</header>
+<main>
+  <section class="hero" aria-labelledby="heading">
+    <p class="eyebrow" id="greeting">BEM-VINDO AO KAIRO</p>
+    <h1 id="heading">Para onde vamos?</h1>
+    <form class="search" action="{{SEARCH_ACTION}}" method="get" role="search">
+      <span class="search-icon">{{SEARCH_ICON}}</span>
+      <label class="sr-only" for="query">Pesquisar com {{SEARCH_NAME}}</label>
+      <input id="query" name="q" type="search" placeholder="Pesquisar com {{SEARCH_NAME}}" autocomplete="off" required>
+      <button type="submit" aria-label="Pesquisar">{{SUBMIT_ICON}}</button>
+    </form>
+    <section class="shortcuts" aria-labelledby="shortcut-heading">
+      <div class="section-heading"><h2 id="shortcut-heading">{{SECTION}}</h2><button type="button" class="manage-shortcuts">Gerenciar favoritos {{EDIT_ICON}}</button></div>
+      <div class="shortcut-grid">{{SHORTCUTS}}</div>
+    </section>
+  </section>
+</main>
+<footer><span class="footer-dot"></span><span>Um espaço seu.</span><span class="keyboard-hint"><kbd>Ctrl</kbd> + <kbd>L</kbd> para buscar</span></footer>
+<script nonce="{{NONCE}}">{{SCRIPT}}</script>
+</body>
+</html>

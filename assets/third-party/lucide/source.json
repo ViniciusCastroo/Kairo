@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/lucide-icons/lucide",
+  "commit": "55782beff3a0133df79c417eb68f96e8f19e2404",
+  "icons": {
+    "arrow-left": "c5f4b88076108eb1a0d95336e1aa7e7bb1419a3a92af96f6247d88cd3456f933",
+    "arrow-right": "288397fdb73bb4f783cf9eabb726ff47357df1d4e3f1201dd748090579f108b9",
+    "rotate-cw": "ddcfe6d87240475946935e77411cd4d15a06f3d28a9b921bafed224ebe953668",
+    "x": "4a9cdab38fbb96162e7dace28e33f4ca0e49d8963a6162abc3d4691b7d675117",
+    "plus": "7f6af73bf1ff6c4bca3f18351c8d1bdec6749c0c2530c4de5da85d520c21df17",
+    "search": "283d371c2e433817bb9c0c8310caa6c77fa4177c0f4f1168d9c83b97af7389dc",
+    "star": "c59da86b889569387db28e69ad00a89f96af22863ad9eea9aa12c4876a14338c",
+    "menu": "af6491988ac1ba30dc5414f485bc48713e957e1edb0fbef4a0dd8691c3c21598",
+    "folder-open": "ee57452b40e71df310214091dd9da1941a397c83197b8ff8d7ae66dd4242578b",
+    "pencil": "7e1ca7a6f5c1eb949671df762f2baadd32f5bd841d43153c3a15279af7d78d0c",
+    "arrow-up": "8c22c25874c80bb062bef985d207d8f1d4a4d7847237d0a8cf720a3235968518",
+    "arrow-down": "2b641c7a59d39450edfed72067fcc9940a1a316a737346af23b4b9103c0689f2",
+    "trash": "27299f69ad7c6272be64b1b8e2d48cbd6dcf0ef0d4f92827a1affa945c91700e"
+  }
+}

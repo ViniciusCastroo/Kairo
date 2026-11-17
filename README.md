@@ -222,7 +222,7 @@ Abra dois endereços na mesma janela e confira voltar/avançar, inclusive seus
 estados desabilitados. Teste os atalhos, a pesquisa com acentos, o título e
 a atualização da barra após redirecionamentos. Digite `javascript:alert(1)`
 e confirme que a barra bloqueia a entrada. Teste erro de conexão e certificado
-inválido, sem contornar a validação TLS. O usuário confirmou abertura do site
+inválido, incluindo voltar e continuar pela página de aviso. O usuário confirmou abertura do site
 Rust, voltar/avançar, recarregamento e pesquisa; os demais casos seguem pendentes.
 
 ### Aceite manual de abas e pop-ups
@@ -267,8 +267,11 @@ negados. Navegar, fechar a aba ou dispensar o diálogo nega o pedido pendente.
 Notificações básicas são encaminhadas ao desktop; ações de clique e recursos
 como captura de tela, DRM e bloqueio do ponteiro ainda não têm fluxo próprio.
 
-Erros de certificado bloqueiam a conexão e apresentam mensagem explícita.
-Não existe botão de exceção e não é alterado o repositório de certificados.
+Erros de certificado bloqueiam a conexão e abrem uma página de aviso com o
+código do erro (por exemplo `NET::ERR_CERT_AUTHORITY_INVALID`). Em
+**Avançado → Continuar**, o certificado apresentado é aceito só para aquele host
+e só até fechar o Kairo; não é gravado em disco nem altera o repositório de
+certificados. A barra mostra **Não seguro** nessas páginas e em `http://`.
 
 ### Aceite manual desta entrega
 

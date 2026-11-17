@@ -12,12 +12,12 @@ fn main() {
     }
     ui::tests::run();
     if std::env::args().any(|arg| arg == "--only-tls") {
-        println!("GTK: certificado inválido bloqueado e mensagem de erro preservada.");
+        println!("GTK: certificado inválido exibe aviso e a exceção manual funciona.");
     } else if std::env::args().any(|arg| arg == "--only-fonts") {
         println!("GTK: Roboto local no GTK e na tela inicial verificada.");
     } else if !std::env::args().any(|arg| arg == "--only-privacy") {
         println!(
-            "GTK: abas, sessões, favoritos, buscas, downloads, permissões, bloqueio TLS e privacidade verificados."
+            "GTK: abas, sessões, favoritos, buscas, downloads, permissões, aviso TLS e privacidade verificados."
         );
     }
 }

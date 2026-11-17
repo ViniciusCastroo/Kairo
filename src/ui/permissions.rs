@@ -44,19 +44,71 @@ impl BrowserWindow {
             browser,
             #[upgrade_or]
             false,
-            move |_, _, _, _| {
+            move |view, uri, certificate, errors| {
+                let host = url::Url::parse(uri).ok().and_then(|url| match url.host()? {
+                    url::Host::Ipv6(address) => Some(address.to_string()),
+                    host => Some(host.to_string()),
+                });
                 if let Some(tab) = browser.views.borrow().get(&id) {
                     tab.tls_failed.set(true);
                     tab.history_pending.set(false);
+                    tab.is_start_page.set(false);
+                    tab.tls_block.replace(host.clone().map(|host| TlsBlock {
+                        uri: uri.to_owned(),
+                        host,
+                        certificate: certificate.clone(),
+                    }));
                 }
                 browser.metrics.borrow_mut().fail(id, false);
-                browser.set_error(
-                    id,
-                    Some("O certificado deste site não é válido. A conexão foi bloqueada.".into()),
-                );
+                let Some(host) = host else {
+                    browser.set_error(
+                        id,
+                        Some(
+                            "O certificado deste site não é válido. A conexão foi bloqueada."
+                                .into(),
+                        ),
+                    );
+                    return true;
+                };
+                // O WebKit ainda emite o fim da carga recusada; o aviso entra depois dele.
+                let html = kairo::browser::tls_error::page(&host, errors);
+                let uri = uri.to_owned();
+                let view = view.downgrade();
+                glib::idle_add_local_once(glib::clone!(
+                    #[weak]
+                    browser,
+                    move || {
+                        let Some(view) = view.upgrade() else { return };
+                        let pending = browser.views.borrow().get(&id).is_some_and(|tab| {
+                            let pending = tab
+                                .tls_block
+                                .borrow()
+                                .as_ref()
+                                .is_some_and(|block| block.uri == uri);
+                            tab.interstitial_loading.set(pending);
+                            pending
+                        });
+                        if pending {
+                            view.load_alternate_html(&html, &uri, None);
+                        }
+                    }
+                ));
                 true
             }
         ));
+        if let Some(manager) = view.user_content_manager() {
+            manager.register_script_message_handler("kairoTls", None);
+            manager.connect_script_message_received(
+                Some("kairoTls"),
+                glib::clone!(
+                    #[weak]
+                    browser,
+                    #[weak]
+                    view,
+                    move |_, value| browser.answer_tls_warning(id, &view, &value.to_str()),
+                ),
+            );
+        }
         view.connect_show_notification(glib::clone!(
             #[weak]
             browser,
@@ -87,6 +139,40 @@ impl BrowserWindow {
                 true
             }
         ));
+    }
+
+    pub(super) fn answer_tls_warning(&self, id: TabId, view: &webkit6::WebView, answer: &str) {
+        let block = {
+            let views = self.views.borrow();
+            let Some(tab) = views.get(&id) else { return };
+            let shown = !tab.interstitial_loading.get()
+                && tab
+                    .tls_block
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(|block| view.uri().as_deref() == Some(block.uri.as_str()));
+            if !shown || self.closing.get() {
+                return;
+            }
+            tab.tls_block.take()
+        };
+        let Some(block) = block else { return };
+        match answer {
+            // Exceção só para esta sessão de rede; some ao fechar o Kairo.
+            "proceed" => {
+                self.network_session
+                    .allow_tls_certificate_for_host(&block.certificate, &block.host);
+                view.load_uri(&block.uri);
+            }
+            "back" if view.can_go_back() => view.go_back(),
+            "back" => view.load_uri(start_page::URI),
+            _ => {
+                self.views
+                    .borrow()
+                    .get(&id)
+                    .map(|tab| tab.tls_block.replace(Some(block)));
+            }
+        }
     }
 
     fn request_permission(

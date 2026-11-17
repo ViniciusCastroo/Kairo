@@ -510,15 +510,16 @@ fn tls_errors_are_blocked(app: &gtk4::Application) {
     let (id, view) = browser.active_view().unwrap();
     wait_until(|| !view.is_loading());
     view.load_uri(&server.url);
-    wait_until(|| {
-        browser.tabs.borrow().get(id).is_some_and(|tab| {
-            tab.error
-                .as_ref()
-                .is_some_and(|error| error.contains("certificado"))
-        }) && !view.is_loading()
-    });
-    assert!(browser.status.is_visible());
-    assert!(
+    let warning_shown = || {
+        !view.is_loading()
+            && browser.views.borrow().get(&id).is_some_and(|tab| {
+                tab.tls_block.borrow().is_some() && !tab.interstitial_loading.get()
+            })
+    };
+    wait_until(warning_shown);
+    assert!(javascript(&view, "document.body.innerText").contains("ERR_CERT_AUTHORITY_INVALID"));
+    assert!(browser.security.is_visible());
+    let history_empty = || {
         browser
             .store
             .as_ref()
@@ -527,7 +528,23 @@ fn tls_errors_are_blocked(app: &gtk4::Application) {
             .history()
             .unwrap()
             .is_empty()
-    );
+    };
+    assert!(history_empty());
+    // Mensagens fora do aviso, ou com resposta desconhecida, não liberam o site.
+    browser.answer_tls_warning(id, &view, "unknown");
+    assert!(browser.views.borrow()[&id].tls_block.borrow().is_some());
+    javascript(&view, "document.getElementById('proceed').click(); 'ok'");
+    wait_until(|| {
+        !view.is_loading()
+            && view.uri().as_deref() == Some(server.url.as_str())
+            && browser.views.borrow()[&id].tls_block.borrow().is_none()
+            && view
+                .tls_info()
+                .is_some_and(|(_, errors)| !errors.is_empty())
+    });
+    assert_eq!(javascript(&view, "document.body.innerText"), "tls-test");
+    assert!(browser.security.is_visible());
+    assert!(!history_empty());
     window.destroy();
 }
 

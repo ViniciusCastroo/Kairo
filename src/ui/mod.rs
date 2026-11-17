@@ -28,12 +28,23 @@ struct TabView {
     header: gtk4::Box,
     is_start_page: Cell<bool>,
     tls_failed: Cell<bool>,
+    /// Certificado recusado enquanto a página de aviso está aberta.
+    tls_block: RefCell<Option<TlsBlock>>,
+    /// Eventos de carregamento da própria página de aviso, ignorados.
+    interstitial_loading: Cell<bool>,
+}
+
+struct TlsBlock {
+    uri: String,
+    host: String,
+    certificate: gio::TlsCertificate,
 }
 
 struct BrowserWindow {
     window: glib::WeakRef<gtk4::ApplicationWindow>,
     notebook: gtk4::Notebook,
     address: gtk4::Entry,
+    security: gtk4::Label,
     status: gtk4::Label,
     storage_status: gtk4::Label,
     spinner: gtk4::Spinner,
@@ -152,6 +163,12 @@ fn build_window_in_mode(
         .build();
     address.add_css_class("kairo-address");
     address.set_icon_from_icon_name(gtk4::EntryIconPosition::Primary, Some(kairo::icons::SEARCH));
+    let security = gtk4::Label::builder()
+        .label("Não seguro")
+        .tooltip_text("A conexão com este site não é segura")
+        .visible(false)
+        .build();
+    security.add_css_class("kairo-insecure");
     let status = gtk4::Label::builder()
         .xalign(0.0)
         .wrap(true)
@@ -188,6 +205,7 @@ fn build_window_in_mode(
     reload_button.set_tooltip_text(Some("Recarregar (Ctrl+R / F5)"));
     reload_button.add_css_class("flat");
     toolbar.append(&reload_button);
+    toolbar.append(&security);
     toolbar.append(&address);
     let bookmark = style::icon_button(kairo::icons::STAR, "Adicionar favorito (Ctrl+D)", 18);
     bookmark.add_css_class("flat");
@@ -282,6 +300,7 @@ fn build_window_in_mode(
         window: window.downgrade(),
         notebook,
         address,
+        security,
         status,
         storage_status,
         spinner,
@@ -730,6 +749,15 @@ impl BrowserWindow {
         }
         self.status.set_text(tab.error.as_deref().unwrap_or(""));
         self.status.set_visible(tab.error.is_some());
+        let insecure = self.views.borrow().get(&id).is_some_and(|candidate| {
+            candidate.tls_block.borrow().is_some()
+                || tab.uri.starts_with("http://")
+                || (tab.uri.starts_with("https://")
+                    && view
+                        .tls_info()
+                        .is_some_and(|(_, errors)| !errors.is_empty()))
+        });
+        self.security.set_visible(insecure);
         if tab.error.is_some() {
             self.address.add_css_class("error");
         } else {
@@ -831,6 +859,8 @@ impl BrowserWindow {
                 header: tab_header,
                 is_start_page: Cell::new(false),
                 tls_failed: Cell::new(false),
+                tls_block: RefCell::new(None),
+                interstitial_loading: Cell::new(false),
             },
         );
         self.connect_view(id, &view);
@@ -952,11 +982,31 @@ impl BrowserWindow {
             #[weak]
             browser,
             move |view, event| {
+                let interstitial = browser.views.borrow().get(&id).is_some_and(|tab| {
+                    if !tab.interstitial_loading.get() {
+                        return false;
+                    }
+                    // Outra navegação começou antes de o aviso terminar de carregar.
+                    let same = tab
+                        .tls_block
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(|block| view.uri().as_deref() == Some(block.uri.as_str()));
+                    if !same || event == webkit6::LoadEvent::Finished {
+                        tab.interstitial_loading.set(false);
+                    }
+                    same
+                });
+                if interstitial {
+                    browser.refresh(id, false);
+                    return;
+                }
                 let record = browser.views.borrow().get(&id).is_some_and(|tab| {
                     match event {
                         webkit6::LoadEvent::Started => {
                             tab.history_pending.set(false);
                             tab.tls_failed.set(false);
+                            tab.tls_block.replace(None);
                         }
                         webkit6::LoadEvent::Committed => {
                             tab.history_pending.set(true);

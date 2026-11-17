@@ -5,6 +5,7 @@ pub mod permissions;
 pub mod search;
 pub mod start_page;
 pub mod tabs;
+pub mod tls_error;
 
 pub fn navigation_target(input: &str, engine: search::SearchEngine) -> Result<Url, &'static str> {
     let input = input.trim();

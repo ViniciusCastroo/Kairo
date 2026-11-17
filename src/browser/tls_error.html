@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erro de privacidade</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #202124; color: #bdc1c6; font: 15px/1.6 Roboto, system-ui, sans-serif; }
+  main { max-width: 600px; margin: 14vh auto 40px; padding: 0 24px; }
+  svg { width: 72px; height: 64px; }
+  h1 { color: #e8eaed; font-size: 26px; font-weight: 400; margin: 28px 0 12px; }
+  .code { font-size: 12px; color: #9aa0a6; margin-top: 12px; }
+  .actions { display: flex; justify-content: space-between; margin-top: 48px; gap: 12px; }
+  button { font: inherit; font-size: 14px; border-radius: 18px; padding: 6px 16px; cursor: pointer; }
+  #advanced { background: transparent; color: #c6c1ff; border: 1px solid #c6c1ff; }
+  #back { background: #c6c1ff; color: #202124; border: 1px solid #c6c1ff; font-weight: 500; }
+  #details { margin-top: 32px; border-top: 1px solid #3c4043; padding-top: 16px; }
+  a { color: #8ab4f8; }
+</style>
+</head>
+<body>
+<main>
+  <svg viewBox="0 0 72 64" aria-hidden="true"><path d="M36 2 70 62H2Z" fill="#e94235"/><rect x="32.5" y="22" width="7" height="22" rx="1" fill="#fff"/><rect x="32.5" y="49" width="7" height="7" rx="1" fill="#fff"/></svg>
+  <h1>Sua conexão não é particular</h1>
+  <p>Invasores podem estar tentando roubar suas informações de <strong>{{HOST}}</strong> (por exemplo, senhas, mensagens ou cartões de crédito).</p>
+  <p class="code">NET::{{CODE}}</p>
+  <div class="actions">
+    <button id="advanced" type="button" aria-expanded="false" aria-controls="details">Avançado</button>
+    <button id="back" type="button">Voltar para a segurança</button>
+  </div>
+  <section id="details" hidden>
+    <p>{{DETAIL}}</p>
+    <p><a id="proceed" href="#">Continuar para {{HOST}} (não seguro)</a></p>
+  </section>
+</main>
+<script>
+  const send = (value) => window.webkit.messageHandlers.kairoTls.postMessage(value);
+  const advanced = document.getElementById('advanced');
+  advanced.addEventListener('click', () => {
+    const details = document.getElementById('details');
+    details.hidden = !details.hidden;
+    advanced.setAttribute('aria-expanded', String(!details.hidden));
+  });
+  document.getElementById('back').addEventListener('click', () => send('back'));
+  document.getElementById('proceed').addEventListener('click', (event) => { event.preventDefault(); send('proceed'); });
+  document.getElementById('back').focus();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "family": "Roboto",
+  "style": "normal",
+  "weight_range": [
+    100,
+    900
+  ],
+  "width_percent": 100,
+  "subset": "latin",
+  "downloaded_at": "2026-11-13",
+  "stylesheet_url": "https://fonts.googleapis.com/css2?family=Roboto:wght@100..900&display=swap",
+  "source_url": "https://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2",
+  "license_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/OFL.txt",
+  "file": "assets/third-party/roboto/Roboto-Latin-Variable.woff2",
+  "bytes": 43136,
+  "sha256": "1404ca348bd75ef836f4dd8b6f2cc719458642d1237c368296b2fc652dca47dc",
+  "runtime_file": {
+    "file": "assets/fonts/Roboto-Latin-Variable.ttf",
+    "format": "TrueType",
+    "bytes": 80500,
+    "sha256": "e50aac2e3f09ad2263b34a9eac8d13b9f52e0c748a9dd3ac7b92ed69a19c1c96",
+    "conversion": "fontTools 4.68.0 TTFont, flavor=None (WOFF2 → TTF)"
+  }
+}

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<title>Teste local de abas</title>
+<h1>Teste local de abas do Kairo</h1>
+<p id="page"></p>
+<p><a href="?page=segunda">Navegar na mesma aba</a></p>
+<p><a href="?page=nova" target="_blank">Abrir link em nova aba</a></p>
+<p><button id="popup">Abrir pop-up por clique</button></p>
+<p><button id="close">Fechar esta aba via script</button> (usável na aba aberta por script)</p>
+<p><label><input type="checkbox" id="protect"> Pedir confirmação antes de fechar</label></p>
+<p><input placeholder="Digite aqui antes de testar o fechamento"></p>
+<script>
+const page = new URLSearchParams(location.search).get('page') || 'primeira';
+document.title = `Kairo: ${page}`;
+document.querySelector('#page').textContent = `Página: ${page}`;
+document.querySelector('#popup').onclick = () => window.open('?page=popup', '_blank');
+document.querySelector('#close').onclick = () => window.close();
+window.addEventListener('beforeunload', event => {
+  if (document.querySelector('#protect').checked) {
+    event.preventDefault();
+    event.returnValue = '';
+  }
+});
+// Sem interação do usuário: deve permanecer bloqueado.
+setTimeout(() => window.open('?page=automatico', '_blank'), 1000);
+</script>
+</html>

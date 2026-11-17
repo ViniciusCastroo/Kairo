@@ -1,0 +1,27 @@
+window.kairo-window { background: #202124; color: #e8eaed; }
+.kairo-titlebar { background: #202124; padding: 3px 5px 0; min-height: 35px; }
+.kairo-tabs { padding: 0; }
+.kairo-tab { min-width: 180px; border-radius: 8px 8px 0 0; background: transparent; color: #b8bac0; }
+.kairo-tab:hover { background: #2c2d30; }
+.kairo-tab.selected { background: #35363a; color: #f1f3f4; }
+.kairo-tab button { background: transparent; border: none; box-shadow: none; color: inherit; min-height: 29px; border-radius: 6px; }
+.kairo-tab-select { padding: 2px 12px; min-width: 138px; }
+.kairo-tab button.kairo-tab-close { padding: 0; margin: 4px 5px 4px 0; min-width: 22px; min-height: 22px; }
+.kairo-tab-close:hover { background: #505156; }
+.kairo-new-tab { margin: 2px 3px; min-width: 27px; min-height: 27px; padding: 0; }
+.kairo-titlebar windowcontrols button { min-width: 27px; min-height: 27px; padding: 0; box-shadow: none; }
+.kairo-toolbar { background: #35363a; padding: 5px 8px; border-bottom: 1px solid #252629; min-height: 35px; }
+.kairo-toolbar button { min-width: 29px; min-height: 29px; padding: 2px; color: #d4d6dc; border: none; border-radius: 7px; box-shadow: none; }
+.kairo-toolbar button:hover { background: #46474c; }
+.kairo-toolbar button:disabled { color: #777980; }
+entry.kairo-address { background: #292a2d; color: #f1f3f4; border: 1px solid #55565e; border-radius: 8px; min-height: 30px; padding: 1px 12px; margin: 0 5px; box-shadow: none; outline: none; }
+entry.kairo-address:focus-within { border-color: #a397ff; box-shadow: 0 0 0 1px #a397ff; }
+entry.kairo-address.error { border-color: #f28b82; }
+entry.kairo-address image { color: #c3c5cd; margin-right: 8px; }
+notebook.kairo-pages { border: none; padding: 0; }
+.private-badge {
+    color: #cab8ff;
+    margin: 0 10px;
+    font-weight: bold;
+}
+* { font-family: "Roboto", sans-serif; }

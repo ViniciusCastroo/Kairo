@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/dev/example/Kairo">
+    <file>icons/scalable/apps/dev.example.Kairo.svg</file>
+    <file>branding/kairo-white-compact.svg</file>
+    <file>branding/kairo-black-compact.svg</file>
+    <file>icons/scalable/actions/kairo-arrow-left-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-arrow-right-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-rotate-cw-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-x-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-plus-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-search-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-star-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-menu-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-folder-open-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-pencil-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-arrow-up-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-arrow-down-symbolic.svg</file>
+    <file>icons/scalable/actions/kairo-trash-symbolic.svg</file>
+    <file>third-party/lucide/LICENSE</file>
+    <file>third-party/roboto/OFL.txt</file>
+  </gresource>
+</gresources>

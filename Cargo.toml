@@ -1,0 +1,24 @@
+[package]
+name = "kairo"
+default-run = "kairo"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Navegador Linux com Rust, GTK4 e WebKitGTK"
+
+[[test]]
+name = "gtk-tabs"
+path = "tests/gtk_tabs.rs"
+harness = false
+
+[dependencies]
+gtk4 = { version = "0.11.5", features = ["v4_10"] }
+libc = "0.2"
+rusqlite = "0.42.0"
+url = "2.5"
+webkit6 = { version = "0.6.1", features = ["v2_46"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"

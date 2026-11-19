@@ -18,8 +18,15 @@ Links que pedem outra janela abrem em uma aba, quando acionados pelo usuário.
 Pop-ups sem interação direta são recusados.
 Histórico, favoritos, preferências e sessão são persistidos em SQLite. Há
 gerenciador de downloads, confirmação de permissões e aviso explícito de erros
-TLS. Há janelas privadas e limpeza dos dados de navegação. Descarte de abas
-e comparação de memória em release ainda estão pendentes.
+TLS. Há janelas privadas e limpeza dos dados de navegação.
+Para economizar memória, abas restauradas da sessão só carregam quando são
+selecionadas, e abas inativas há 15 minutos têm o processo da página encerrado
+(a aba, o título e o histórico continuam; a página recarrega ao voltar). Não são
+descartadas abas com áudio, câmera, microfone, compartilhamento de tela, carga em
+andamento, pedido de permissão, aviso de certificado ou formulário editado.
+Cada processo de página libera caches acima de ~200 MiB e faz limpeza agressiva
+acima de ~360 MiB. Se o processo de uma página travar, a barra avisa.
+Comparação com Chrome, Brave e Firefox em `benchmarks/README.md`.
 As versões SVG da marca fornecida pelo usuário estão preservadas em
 `assets/branding`; logo e ícone são embarcados na aplicação.
 Os controles usam 13 SVGs do [Lucide](https://lucide.dev), incluídos localmente

@@ -2,11 +2,12 @@
 # Compara memória (PSS) e CPU do Kairo com Chrome, Brave e Firefox.
 # Cada execução usa um perfil novo e descartável, a mesma janela e as mesmas URLs.
 # Uso: scripts/compare-browsers.sh [execuções=5] [estabilização_s=15]
+# Filtros opcionais: BROWSERS="kairo chrome" SCENARIOS="five-sites" OUT=pasta
 set -euo pipefail
 cd "$(dirname "$0")/.."
 runs=${1:-5}
 settle=${2:-15}
-out="benchmarks/results/$(date +%F)-compare"
+out=${OUT:-"benchmarks/results/$(date +%F)-compare"}
 [[ -e $out ]] && { echo "$out já existe; mova ou apague antes." >&2; exit 1; }
 cargo build --release --locked -q
 
@@ -19,6 +20,12 @@ browsers=(kairo)
 command -v google-chrome >/dev/null && browsers+=(chrome)
 command -v brave-browser >/dev/null && browsers+=(brave)
 command -v firefox >/dev/null && browsers+=(firefox)
+[[ -n ${BROWSERS:-} ]] && read -ra browsers <<<"$BROWSERS"
+if [[ -n ${SCENARIOS:-} ]]; then
+    for scenario in "${!scenarios[@]}"; do
+        [[ " $SCENARIOS " == *" $scenario "* ]] || unset "scenarios[$scenario]"
+    done
+fi
 
 label() {
     case $1 in
@@ -99,6 +106,8 @@ print("| Cenário | Navegador | PSS mediana (MiB) | CPU mediana (%) | Processos 
 print("| --- | --- | ---: | ---: | ---: |")
 note = False
 for scenario in ("empty", "one-site", "five-sites"):
+    if not glob.glob(f"{out}/*/{scenario}"):
+        continue
     for browser in browsers:
         runs, name = [], browser
         for path in sorted(glob.glob(f"{out}/{browser}/{scenario}/run-*.csv")):

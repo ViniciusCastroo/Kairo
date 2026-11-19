@@ -45,55 +45,7 @@ impl BrowserWindow {
             #[upgrade_or]
             false,
             move |view, uri, certificate, errors| {
-                let host = url::Url::parse(uri).ok().and_then(|url| match url.host()? {
-                    url::Host::Ipv6(address) => Some(address.to_string()),
-                    host => Some(host.to_string()),
-                });
-                if let Some(tab) = browser.views.borrow().get(&id) {
-                    tab.tls_failed.set(true);
-                    tab.history_pending.set(false);
-                    tab.is_start_page.set(false);
-                    tab.tls_block.replace(host.clone().map(|host| TlsBlock {
-                        uri: uri.to_owned(),
-                        host,
-                        certificate: certificate.clone(),
-                    }));
-                }
-                browser.metrics.borrow_mut().fail(id, false);
-                let Some(host) = host else {
-                    browser.set_error(
-                        id,
-                        Some(
-                            "O certificado deste site não é válido. A conexão foi bloqueada."
-                                .into(),
-                        ),
-                    );
-                    return true;
-                };
-                // O WebKit ainda emite o fim da carga recusada; o aviso entra depois dele.
-                let html = kairo::browser::tls_error::page(&host, errors);
-                let uri = uri.to_owned();
-                let view = view.downgrade();
-                glib::idle_add_local_once(glib::clone!(
-                    #[weak]
-                    browser,
-                    move || {
-                        let Some(view) = view.upgrade() else { return };
-                        let pending = browser.views.borrow().get(&id).is_some_and(|tab| {
-                            let pending = tab
-                                .tls_block
-                                .borrow()
-                                .as_ref()
-                                .is_some_and(|block| block.uri == uri);
-                            tab.interstitial_loading.set(pending);
-                            tab.interstitial_committed.set(false);
-                            pending
-                        });
-                        if pending {
-                            view.load_alternate_html(&html, &uri, None);
-                        }
-                    }
-                ));
+                browser.block_tls(id, view, uri, certificate, errors);
                 true
             }
         ));
@@ -142,6 +94,62 @@ impl BrowserWindow {
         ));
     }
 
+    /// Recusa a página e mostra o aviso. Também chamado quando uma página com erro
+    /// de certificado chega a carregar sem o sinal do WebKit e sem exceção do usuário.
+    pub(super) fn block_tls(
+        self: &Rc<Self>,
+        id: TabId,
+        view: &webkit6::WebView,
+        uri: &str,
+        certificate: &gio::TlsCertificate,
+        errors: gio::TlsCertificateFlags,
+    ) {
+        let host = tls_host(uri);
+        if let Some(tab) = self.views.borrow().get(&id) {
+            tab.tls_failed.set(true);
+            tab.history_pending.set(false);
+            tab.is_start_page.set(false);
+            tab.tls_block.replace(host.clone().map(|host| TlsBlock {
+                uri: uri.to_owned(),
+                host,
+                certificate: certificate.clone(),
+            }));
+        }
+        self.metrics.borrow_mut().fail(id, false);
+        let Some(host) = host else {
+            self.set_error(
+                id,
+                Some("O certificado deste site não é válido. A conexão foi bloqueada.".into()),
+            );
+            return;
+        };
+        // O WebKit ainda emite o fim da carga recusada; o aviso entra depois dele.
+        let html = kairo::browser::tls_error::page(&host, errors);
+        let uri = uri.to_owned();
+        let view = view.downgrade();
+        let browser = self.clone();
+        glib::idle_add_local_once(glib::clone!(
+            #[weak]
+            browser,
+            move || {
+                let Some(view) = view.upgrade() else { return };
+                let pending = browser.views.borrow().get(&id).is_some_and(|tab| {
+                    let pending = tab
+                        .tls_block
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(|block| block.uri == uri);
+                    tab.interstitial_loading.set(pending);
+                    tab.interstitial_committed.set(false);
+                    pending
+                });
+                if pending {
+                    view.load_alternate_html(&html, &uri, None);
+                }
+            }
+        ));
+    }
+
     pub(super) fn answer_tls_warning(&self, id: TabId, view: &webkit6::WebView, answer: &str) {
         let block = {
             let views = self.views.borrow();
@@ -163,6 +171,7 @@ impl BrowserWindow {
             "proceed" => {
                 self.network_session
                     .allow_tls_certificate_for_host(&block.certificate, &block.host);
+                self.tls_exceptions.borrow_mut().insert(block.host.clone());
                 view.load_uri(&block.uri);
             }
             "back" if view.can_go_back() => view.go_back(),
@@ -307,4 +316,11 @@ impl BrowserWindow {
             self.cancel_permission(id);
         }
     }
+}
+
+pub(super) fn tls_host(uri: &str) -> Option<String> {
+    url::Url::parse(uri).ok().and_then(|url| match url.host()? {
+        url::Host::Ipv6(address) => Some(address.to_string()),
+        host => Some(host.to_string()),
+    })
 }

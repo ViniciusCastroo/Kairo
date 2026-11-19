@@ -15,6 +15,7 @@ use crate::storage::{Preferences, Session, Store, restorable_uri};
 
 mod bookmarks;
 mod data;
+mod discard;
 mod downloads;
 mod metrics;
 mod permissions;
@@ -34,6 +35,12 @@ struct TabView {
     interstitial_loading: Cell<bool>,
     /// O aviso já foi exibido; só então o fim de carga é dele, e não da conexão recusada.
     interstitial_committed: Cell<bool>,
+    /// Endereço de aba restaurada que só carrega quando for selecionada.
+    pending_uri: RefCell<Option<String>>,
+    /// Processo da página encerrado para liberar memória; recarrega ao selecionar.
+    discarded: Cell<bool>,
+    /// Quando a aba deixou de ser a ativa.
+    last_active: Cell<std::time::Instant>,
 }
 
 struct TlsBlock {
@@ -65,6 +72,8 @@ struct BrowserWindow {
     tab_scroll: gtk4::ScrolledWindow,
     reload_button: gtk4::Button,
     web_context: webkit6::WebContext,
+    /// Hosts cujo certificado inválido o usuário aceitou nesta sessão.
+    tls_exceptions: RefCell<std::collections::HashSet<String>>,
     bookmarks_window: glib::WeakRef<gtk4::Window>,
     bookmarks_list: glib::WeakRef<gtk4::ListBox>,
     network_session: webkit6::NetworkSession,
@@ -109,6 +118,18 @@ fn build_window(
     #[cfg(not(test))]
     let network_session = webkit6::NetworkSession::default().expect("Sessão de rede do WebKit");
     build_window_in_mode(app, store, warning, None, network_session)
+}
+
+fn web_context() -> webkit6::WebContext {
+    // Limite por processo de página: acima de ~200 MiB o WebKit libera caches e
+    // acima de ~360 MiB faz limpeza agressiva. Nenhum processo é encerrado à força.
+    let mut pressure = webkit6::MemoryPressureSettings::new();
+    pressure.set_memory_limit(1024);
+    pressure.set_conservative_threshold(0.2);
+    pressure.set_strict_threshold(0.35);
+    webkit6::WebContext::builder()
+        .memory_pressure_settings(&pressure)
+        .build()
 }
 
 fn build_window_in_mode(
@@ -321,7 +342,8 @@ fn build_window_in_mode(
         tab_strip,
         tab_scroll,
         reload_button,
-        web_context: webkit6::WebContext::new(),
+        web_context: web_context(),
+        tls_exceptions: RefCell::default(),
         bookmarks_window: glib::WeakRef::new(),
         bookmarks_list: glib::WeakRef::new(),
         network_session,
@@ -380,8 +402,12 @@ fn build_window_in_mode(
                     .filter(|previous| *previous != id)
                 {
                     browser.cancel_permission(previous);
+                    browser.left_tab(previous);
                 }
                 browser.tabs.borrow_mut().select(id);
+                if !browser.restoring.get() {
+                    browser.wake(id);
+                }
                 browser.sync(true);
                 browser.queue_session();
             }
@@ -391,8 +417,13 @@ fn build_window_in_mode(
         let home = browser.preferences.borrow().home_page.clone();
         browser.add_view(browser.new_view(), Some(&home));
     } else {
-        for uri in &session.urls {
-            browser.add_view(browser.new_view(), Some(uri));
+        // Só a aba ativa carrega agora; as demais esperam ser selecionadas.
+        for (index, uri) in session.urls.iter().enumerate() {
+            if index == session.active {
+                browser.add_view(browser.new_view(), Some(uri));
+            } else {
+                browser.add_pending_view(uri);
+            }
         }
         browser
             .notebook
@@ -400,6 +431,7 @@ fn build_window_in_mode(
     }
     browser.restoring.set(false);
     browser.queue_session();
+    browser.schedule_discard();
     window.connect_close_request(glib::clone!(
         #[weak]
         browser,
@@ -707,7 +739,9 @@ impl BrowserWindow {
             });
         match untouched {
             Some((_, view)) => view.load_uri(target.as_str()),
-            None => self.add_view(self.new_view(), Some(target.as_str())),
+            None => {
+                self.add_view(self.new_view(), Some(target.as_str()));
+            }
         }
     }
 
@@ -821,14 +855,23 @@ impl BrowserWindow {
                 return;
             };
             if let Some(tab) = self.tabs.borrow_mut().get_mut(id) {
-                tab.uri = view
-                    .webview
-                    .uri()
-                    .map(|uri| uri.to_string())
-                    .unwrap_or_default();
-                tab.title = view
-                    .webview
-                    .title()
+                // Aba descartada: o WebKit mostra about:blank, o histórico guarda a página.
+                let kept = view
+                    .discarded
+                    .get()
+                    .then(|| view.webview.back_forward_list()?.current_item())
+                    .flatten();
+                tab.uri = view.pending_uri.borrow().clone().unwrap_or_else(|| {
+                    kept.as_ref()
+                        .and_then(|item| item.uri())
+                        .or_else(|| view.webview.uri())
+                        .map(|uri| uri.to_string())
+                        .unwrap_or_default()
+                });
+                tab.title = kept
+                    .as_ref()
+                    .and_then(|item| item.title())
+                    .or_else(|| view.webview.title())
                     .filter(|title| !title.is_empty())
                     .map(|title| title.to_string())
                     .unwrap_or_else(|| {
@@ -853,10 +896,10 @@ impl BrowserWindow {
         }
     }
 
-    fn add_view(self: &Rc<Self>, view: webkit6::WebView, uri: Option<&str>) {
+    fn add_view(self: &Rc<Self>, view: webkit6::WebView, uri: Option<&str>) -> Option<TabId> {
         if self.clearing_data.get() {
             view.stop_loading();
-            return;
+            return None;
         }
         let id = self.tabs.borrow_mut().open();
         let label = gtk4::Label::builder()
@@ -903,6 +946,9 @@ impl BrowserWindow {
                 tls_block: RefCell::new(None),
                 interstitial_loading: Cell::new(false),
                 interstitial_committed: Cell::new(false),
+                pending_uri: RefCell::new(None),
+                discarded: Cell::new(false),
+                last_active: Cell::new(std::time::Instant::now()),
             },
         );
         self.connect_view(id, &view);
@@ -912,6 +958,7 @@ impl BrowserWindow {
             view.load_uri(uri);
         }
         self.refresh(id, true);
+        Some(id)
     }
 
     fn remove_tab(self: &Rc<Self>, id: TabId) {
@@ -943,6 +990,7 @@ impl BrowserWindow {
     fn connect_view(self: &Rc<Self>, id: TabId, view: &webkit6::WebView) {
         let browser = self.clone();
         self.connect_permissions(id, view);
+        self.connect_crash(id, view);
         view.connect_decide_policy(|_, decision, kind| {
             if kind == webkit6::PolicyDecisionType::Response
                 && let Some(response) = decision.downcast_ref::<webkit6::ResponsePolicyDecision>()
@@ -1067,6 +1115,19 @@ impl BrowserWindow {
                     }
                     false
                 });
+                // Segunda barreira: página com erro de certificado que carregou sem
+                // passar pelo aviso e sem exceção do usuário é recusada aqui.
+                if event == webkit6::LoadEvent::Committed
+                    && let Some(uri) = view.uri().filter(|uri| uri.starts_with("https://"))
+                    && let Some((certificate, errors)) = view.tls_info()
+                    && !errors.is_empty()
+                    && !permissions::tls_host(&uri)
+                        .is_some_and(|host| browser.tls_exceptions.borrow().contains(&host))
+                {
+                    view.stop_loading();
+                    browser.block_tls(id, view, &uri, &certificate, errors);
+                    return;
+                }
                 if event == webkit6::LoadEvent::Started {
                     browser.cancel_permission(id);
                     browser.metrics.borrow_mut().begin(id);

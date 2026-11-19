@@ -7,10 +7,10 @@
 | Bootstrap, HTTPS e navegação | Implementados e testados no protótipo |
 | Abas e pop-ups | Implementados; casos reais de pop-ups e confirmação de saída ainda precisam de validação |
 | Histórico, preferências e sessões | Implementados; reinício confirmado pelo usuário |
-| Métricas e benchmark | Instrumentação pronta e cinco ensaios GTK debug registrados; comparação release com Firefox/Chromium e demais cenários pendentes |
-| Descarte seguro de abas | Pendente |
+| Métricas e benchmark | Comparação release com Chrome, Brave e Firefox em três cenários (`scripts/compare-browsers.sh`); dez abas com nove inativas e sessenta minutos de navegação pendentes |
+| Descarte seguro de abas | Restauração sob demanda e descarte após 15 min de inatividade, com exceções para áudio, captura, formulários editados e tarefas ativas; testado no GTK |
 | Downloads e permissões | Primeira implementação pronta; testes locais de transferência, cancelamento e recusa de localização passaram; dispositivos e portal ainda exigem aceite manual |
-| Privacidade e TLS | Certificado inválido bloqueado; janela privada isolada e limpeza de histórico, sessão e dados dos sites implementadas e testadas localmente |
+| Privacidade e TLS | Certificado inválido abre aviso com exceção só na sessão e segunda verificação no commit da página; janela privada isolada e limpeza de histórico, sessão e dados dos sites implementadas e testadas localmente |
 | Flatpak, CI e alpha | Pendentes, incluindo licença, identidade final e rotina de atualizações |
 
 Extras já implementados: interface escura, tela inicial local, escolha de
@@ -91,7 +91,7 @@ Os testes usam armazenamento temporário. A transação SQLite também foi testa
 com falha simulada para verificar rollback. O aceite manual em sites reais ainda
 deve conferir login/logout, downloads e permissões nas janelas privadas.
 
-Próximas entregas: comparação de memória em cenários reais e descarte seguro de abas elegíveis;
+Próximas entregas: cenários de benchmark com abas inativas e navegação longa;
 empacotamento Flatpak e CI para o alpha.
 
 | Etapa | Entrega | Critério de aceite |

@@ -465,6 +465,7 @@ fn permissions_work(app: &gtk4::Application) {
         .unwrap()
         .emit_clicked();
     wait_until(|| browser.permission_prompts.borrow().is_empty());
+    wait_until(|| javascript(&view, "window.geoStatus") != "pending");
     assert_eq!(javascript(&view, "window.geoStatus"), "denied:1");
     let second = LocalServer::start();
     view.load_uri(&format!("{}/permissions", second.url));
@@ -509,14 +510,47 @@ fn tls_errors_are_blocked(app: &gtk4::Application) {
     window.present();
     let (id, view) = browser.active_view().unwrap();
     wait_until(|| !view.is_loading());
+    // Fora do escopo deste teste: na suíte completa a GIO às vezes cancela a conexão
+    // antes do handshake (sessões de rede de janelas anteriores sendo destruídas).
+    // Nesse caso não há certificado avaliado; a carga é repetida.
+    let cancelled = Rc::new(Cell::new(false));
+    let handler = view.connect_load_failed(glib::clone!(
+        #[strong]
+        cancelled,
+        move |_, _, _, error| {
+            cancelled.set(cancelled.get() || error.matches(gio::IOErrorEnum::Cancelled));
+            false
+        }
+    ));
     view.load_uri(&server.url);
+    let retries = Cell::new(0);
     let warning_shown = || {
         !view.is_loading()
             && browser.views.borrow().get(&id).is_some_and(|tab| {
                 tab.tls_block.borrow().is_some() && !tab.interstitial_loading.get()
             })
     };
-    wait_until(warning_shown);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(9);
+    wait_until(|| {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "Aviso TLS não apareceu: uri={:?} tls={:?} carregando={} erro={:?}",
+            view.uri(),
+            view.tls_info().map(|(_, errors)| errors),
+            view.is_loading(),
+            browser
+                .tabs
+                .borrow()
+                .get(id)
+                .and_then(|tab| tab.error.clone()),
+        );
+        if cancelled.replace(false) && retries.get() < 3 {
+            retries.set(retries.get() + 1);
+            view.load_uri(&server.url);
+        }
+        warning_shown()
+    });
+    view.disconnect(handler);
     assert!(javascript(&view, "document.body.innerText").contains("ERR_CERT_AUTHORITY_INVALID"));
     assert!(browser.security.is_visible());
     let history_empty = || {
@@ -580,7 +614,7 @@ impl TlsServer {
                 "-days",
                 "1",
                 "-addext",
-                "subjectAltName=DNS:localhost",
+                "subjectAltName=DNS:localhost,IP:127.0.0.1",
                 "-keyout",
             ])
             .arg(&key)
@@ -592,7 +626,9 @@ impl TlsServer {
             output.status.success(),
             "Não foi possível gerar o certificado de teste"
         );
-        let script = "import http.server, ssl, sys\nclass Handler(http.server.BaseHTTPRequestHandler):\n def do_GET(self):\n  self.send_response(200)\n  self.end_headers()\n  self.wfile.write(b'tls-test')\n def log_message(self, *args): pass\ns = http.server.HTTPServer(('127.0.0.1', 0), Handler)\nc = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)\nc.load_cert_chain(sys.argv[1], sys.argv[2])\ns.socket = c.wrap_socket(s.socket, server_side=True)\nprint(s.server_port, flush=True)\ns.serve_forever()";
+        // Servidor com threads e handshake fora do accept(): uma conexão antecipada
+        // do WebKit não pode travar as outras e cancelar a carga.
+        let script = "import http.server, ssl, sys\nclass Handler(http.server.BaseHTTPRequestHandler):\n def do_GET(self):\n  self.send_response(200)\n  self.end_headers()\n  self.wfile.write(b'tls-test')\n def log_message(self, *args): pass\ns = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)\nc = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)\nc.load_cert_chain(sys.argv[1], sys.argv[2])\ns.socket = c.wrap_socket(s.socket, server_side=True, do_handshake_on_connect=False)\nprint(s.server_port, flush=True)\ns.serve_forever()";
         let mut child = std::process::Command::new("python3")
             .arg("-c")
             .arg(script)
@@ -610,7 +646,9 @@ impl TlsServer {
         Self {
             child,
             directory,
-            url: format!("https://localhost:{port}/"),
+            // IP explícito: `localhost` também resolve para ::1, onde outro programa
+            // pode estar escutando na mesma porta.
+            url: format!("https://127.0.0.1:{port}/"),
         }
     }
 }
@@ -1196,6 +1234,59 @@ fn persistence_survives_window_restart(app: &gtk4::Application) {
     restored.flush_session();
     assert_eq!(profile.borrow().session().unwrap(), expected);
     assert_eq!(restored.address.text().as_str(), first_uri);
+
+    // A aba restaurada em segundo plano só carrega quando é selecionada.
+    let (restored_first, restored_second) = {
+        let views = restored.views.borrow();
+        let pending = |wanted: bool| {
+            *views
+                .iter()
+                .find(|(_, tab)| tab.pending_uri.borrow().is_some() == wanted)
+                .unwrap()
+                .0
+        };
+        (pending(false), pending(true))
+    };
+    let second_view = restored.views.borrow()[&restored_second].webview.clone();
+    assert!(second_view.uri().is_none_or(|uri| uri.is_empty()));
+    restored.select(restored_second);
+    wait_until(|| {
+        !second_view.is_loading() && second_view.uri().as_deref() == Some(expected.urls[1].as_str())
+    });
+
+    // Formulário editado impede o descarte; sem ele, a aba inativa é descartada
+    // e volta ao ser selecionada, sem perder o lugar na sessão.
+    javascript(
+        &second_view,
+        "document.body.append(Object.assign(document.createElement('input'), {value: 'rascunho'})); 'ok'",
+    );
+    restored.select(restored_first);
+    restored.discard_inactive(std::time::Duration::ZERO);
+    javascript(&second_view, "'depois da verificação'");
+    assert!(!restored.views.borrow()[&restored_second].discarded.get());
+    restored.select(restored_second);
+    javascript(
+        &second_view,
+        "document.querySelector('input').remove(); 'ok'",
+    );
+    restored.select(restored_first);
+    restored.discard_inactive(std::time::Duration::ZERO);
+    wait_until(|| restored.views.borrow()[&restored_second].discarded.get());
+    restored.flush_session();
+    assert_eq!(profile.borrow().session().unwrap(), expected);
+    assert!(!restored.status.is_visible());
+    restored.select(restored_second);
+    wait_until(|| {
+        !restored.views.borrow()[&restored_second].discarded.get()
+            && !second_view.is_loading()
+            && second_view.uri().as_deref() == Some(expected.urls[1].as_str())
+    });
+    assert_eq!(
+        javascript(&second_view, "String(document.querySelector('input'))"),
+        "null"
+    );
+    restored.select(restored_first);
+    restored.flush_session();
 
     // Limpar o histórico não apaga a sessão; desativar restauração apaga só a sessão.
     profile.borrow().clear_history().unwrap();

@@ -53,6 +53,26 @@ inclui o custo do próprio medidor; prefira o coletor externo para benchmarks.
 
 Fonte do formato e das definições: [documentação do kernel Linux sobre /proc](https://docs.kernel.org/filesystems/proc.html).
 
+## Comparação com outros navegadores
+
+```bash
+scripts/compare-browsers.sh [execuções=5] [estabilização_s=15]
+```
+
+Abre Kairo (release), Chrome, Brave e Firefox, os que estiverem instalados, cada um
+com perfil novo e descartável, janela de 1100 × 740 e as mesmas URLs, em três
+cenários: `about:blank`, um artigo da Wikipédia e cinco sites em abas. Depois de
+estabilizar, coleta 5 amostras com `kairo-metrics`, encerra o grupo de processos e
+apaga o perfil. As execuções são intercaladas entre navegadores. O resultado vai para
+`benchmarks/results/<data>-compare/`: CSVs, um `summary.md` por navegador/cenário e
+uma tabela comparativa. O Brave usa um auxiliar setuid-root (`chrome-sandbox`) cujo
+PSS não é legível. A tabela soma apenas o PSS legível e marca esses casos; o resumo
+oficial daquele grupo mostra o PSS como indisponível.
+
+Limites: sites reais variam entre execuções; navegadores Chromium podem adiar o
+carregamento de abas em segundo plano; a sessão gráfica não é isolada de outros
+aplicativos. Feche outras instâncias pesadas antes de rodar.
+
 ## Verificação inicial
 
 [Dados e resumo de cinco execuções](results/2026-11-13-smoke/summary.md) validam o

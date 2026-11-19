@@ -73,6 +73,18 @@ Limites: sites reais variam entre execuções; navegadores Chromium podem adiar 
 carregamento de abas em segundo plano; a sessão gráfica não é isolada de outros
 aplicativos. Feche outras instâncias pesadas antes de rodar.
 
+### Resultados
+
+- [2026-11-19, após limites de memória e descarte de abas](results/2026-11-19-compare-v2/summary.md):
+  PSS mediana do Kairo 271 / 313 / 749 MiB (vazio / 1 site / 5 sites), contra
+  373 / 422 / 663 MiB do Chrome e 665 / 628 / 1130 MiB do Firefox na mesma rodada.
+- [2026-11-19, primeira rodada](results/2026-11-19-compare/summary.md).
+
+Compare navegadores dentro da mesma rodada: entre rodadas, os números de todos
+mudam com a carga da máquina e o conteúdo dos sites. No cenário de cinco sites, o
+Brave fica igual ao vazio, provavelmente por adiar as abas de fundo; não use esse
+número para comparar.
+
 ## Verificação inicial
 
 [Dados e resumo de cinco execuções](results/2026-11-13-smoke/summary.md) validam o

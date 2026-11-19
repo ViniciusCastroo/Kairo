@@ -141,6 +141,10 @@ cargo test --locked --offline --test gtk-tabs -- --run-gtk
 O identificador `dev.example.Kairo` é provisório para desenvolvimento.
 O protótipo mantém as configurações padrão de sandbox e TLS do WebKitGTK.
 
+Endereços passados na linha de comando abrem em abas (`kairo https://a https://b`),
+também quando o Kairo já está aberto; uma janela nova só com a página inicial
+é reaproveitada.
+
 ### Instalar no menu de aplicativos
 
 ```bash

@@ -86,6 +86,7 @@ impl BrowserWindow {
                                 .as_ref()
                                 .is_some_and(|block| block.uri == uri);
                             tab.interstitial_loading.set(pending);
+                            tab.interstitial_committed.set(false);
                             pending
                         });
                         if pending {

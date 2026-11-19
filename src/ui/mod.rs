@@ -32,6 +32,8 @@ struct TabView {
     tls_block: RefCell<Option<TlsBlock>>,
     /// Eventos de carregamento da própria página de aviso, ignorados.
     interstitial_loading: Cell<bool>,
+    /// O aviso já foi exibido; só então o fim de carga é dele, e não da conexão recusada.
+    interstitial_committed: Cell<bool>,
 }
 
 struct TlsBlock {
@@ -81,7 +83,7 @@ struct BrowserWindow {
     download_test_cancel: Cell<bool>,
 }
 
-pub fn present_window(app: &gtk4::Application) {
+pub fn present_window(app: &gtk4::Application) -> gtk4::ApplicationWindow {
     let (store, warning) = match Store::open_default() {
         Ok(store) => (Some(Rc::new(RefCell::new(store))), None),
         Err(error) => (
@@ -93,6 +95,7 @@ pub fn present_window(app: &gtk4::Application) {
     };
     let (window, _) = build_window(app, store, warning);
     window.present();
+    window
 }
 
 fn build_window(
@@ -532,6 +535,19 @@ impl BrowserWindow {
             ));
             window.add_action(action);
         }
+        // Endereços da linha de comando: `kairo https://a https://b`.
+        let open_uri = gio::SimpleAction::new("open-uri", Some(glib::VariantTy::STRING));
+        let browser = self.clone();
+        open_uri.connect_activate(glib::clone!(
+            #[weak]
+            browser,
+            move |_, parameter| {
+                if let Some(input) = parameter.and_then(|value| value.str()) {
+                    browser.open_uri(input);
+                }
+            }
+        ));
+        window.add_action(&open_uri);
         self.action(window, "reload", |browser| {
             if let Some((_, view)) = browser.active_view() {
                 view.reload();
@@ -667,6 +683,31 @@ impl BrowserWindow {
         let next = self.tabs.borrow().adjacent(delta);
         if let Some(id) = next {
             self.select(id);
+        }
+    }
+
+    fn open_uri(self: &Rc<Self>, input: &str) {
+        if self.clearing_data.get() || self.closing.get() {
+            return;
+        }
+        let engine = self.preferences.borrow().search_engine;
+        let Ok(target) = navigation_target(input, engine) else {
+            return;
+        };
+        // Uma janela recém-aberta só com a página inicial é reaproveitada.
+        let untouched = (self.notebook.n_pages() == 1)
+            .then(|| self.active_view())
+            .flatten()
+            .filter(|(_, view)| {
+                !view.can_go_back()
+                    && matches!(
+                        view.uri().as_deref(),
+                        None | Some("") | Some("about:blank") | Some(start_page::URI)
+                    )
+            });
+        match untouched {
+            Some((_, view)) => view.load_uri(target.as_str()),
+            None => self.add_view(self.new_view(), Some(target.as_str())),
         }
     }
 
@@ -861,6 +902,7 @@ impl BrowserWindow {
                 tls_failed: Cell::new(false),
                 tls_block: RefCell::new(None),
                 interstitial_loading: Cell::new(false),
+                interstitial_committed: Cell::new(false),
             },
         );
         self.connect_view(id, &view);
@@ -992,8 +1034,15 @@ impl BrowserWindow {
                         .borrow()
                         .as_ref()
                         .is_some_and(|block| view.uri().as_deref() == Some(block.uri.as_str()));
-                    if !same || event == webkit6::LoadEvent::Finished {
+                    if event == webkit6::LoadEvent::Committed {
+                        tab.interstitial_committed.set(true);
+                    }
+                    if !same
+                        || (event == webkit6::LoadEvent::Finished
+                            && tab.interstitial_committed.get())
+                    {
                         tab.interstitial_loading.set(false);
+                        tab.interstitial_committed.set(false);
                     }
                     same
                 });

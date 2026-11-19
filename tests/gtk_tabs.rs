@@ -5,7 +5,7 @@ mod ui;
 fn main() {
     performance::start_clock();
     // WebKit/GTK precisam inicializar na thread principal, fora do libtest.
-    let _ = ui::present_window as fn(&gtk4::Application);
+    let _ = ui::present_window as fn(&gtk4::Application) -> gtk4::ApplicationWindow;
     if !std::env::args().any(|arg| arg == "--run-gtk") {
         println!("Teste GTK opcional: cargo test --test gtk-tabs -- --run-gtk");
         return;
